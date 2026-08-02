@@ -1,0 +1,59 @@
+// src/main.cpp
+#include <QCoreApplication>
+#include <QDebug>
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+
+#include "backend/storage/database_manager.h"
+#include "frontend/categories_controller.h"
+#include "frontend/overview_controller.h"
+#include "frontend/reports_controller.h"
+
+#include "frontend/settings_controller.h"
+#include "frontend/transactions_controller.h"
+#include "frontend/bills_controller.h"
+#include "frontend/budgets_controller.h"
+#include "frontend/savings_controller.h"
+#include "frontend/session_controller.h"
+
+int main(int argc, char *argv[])
+{
+    QGuiApplication app(argc, argv);
+
+    // Initialize Database & load data from CSVs
+    DatabaseManager &db = DatabaseManager::instance();
+    db.loadCategoriesFromCSV();
+    db.loadTransactionsFromCSV();
+    db.loadBillsFromCSV();
+    db.loadBudgetsFromCSV();
+    db.loadSavingsFromCSV();
+
+    // Instantiate Controllers for your pages
+    CategoriesController categoriesCtrl;
+    OverviewController overviewCtrl;
+    ReportsController reportsCtrl;
+    SettingsController settingsCtrl;
+    TransactionsController transactionsCtrl;
+    BillsController billsCtrl;
+    BudgetsController budgetsCtrl;
+    SavingsController savingsCtrl;
+    SessionController sessionCtrl;
+
+    QQmlApplicationEngine engine;
+
+    // Expose controllers as QML Context Properties
+    engine.rootContext()->setContextProperty("categoriesController", &categoriesCtrl);
+    engine.rootContext()->setContextProperty("overviewController", &overviewCtrl);
+    engine.rootContext()->setContextProperty("reportsController", &reportsCtrl);
+    engine.rootContext()->setContextProperty("settingsController", &settingsCtrl);
+    engine.rootContext()->setContextProperty("transactionsController", &transactionsCtrl);
+    engine.rootContext()->setContextProperty("billsController", &billsCtrl);
+    engine.rootContext()->setContextProperty("budgetsController", &budgetsCtrl);
+    engine.rootContext()->setContextProperty("savingsController", &savingsCtrl);
+    engine.rootContext()->setContextProperty("sessionController", &sessionCtrl);
+
+    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/src/qml/Main.qml")));
+
+    return app.exec();
+}
