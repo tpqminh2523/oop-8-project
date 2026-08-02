@@ -1,4 +1,5 @@
 #include "categories_controller.h"
+#include <QLocale>
 
 CategoriesController::CategoriesController(QObject *parent)
     : QObject(parent), m_searchText(""), m_parentFilter(0) {}
@@ -33,6 +34,7 @@ static QString getParentCategoryName(int parentId) {
 QVariantList CategoriesController::categoriesList() const {
     QVariantList list;
     const QVector<Category>& categories = DatabaseManager::instance().getAllCategories();
+    const QVector<Transaction*>& transactions = DatabaseManager::instance().getAllTransactions();
 
     for (const auto &cat : categories) {
         // Filter by parentId (0 means All Categories)
@@ -45,6 +47,14 @@ QVariantList CategoriesController::categoriesList() const {
             continue;
         }
 
+        // Sum every real transaction that belongs to this category (was hardcoded to "0 VND")
+        double totalAmount = 0.0;
+        for (const Transaction* t : transactions) {
+            if (t && t->getCategoryId() == cat.getId()) {
+                totalAmount += t->getAmount();
+            }
+        }
+
         QVariantMap item;
         item["id"] = cat.getId();
         item["name"] = cat.getName();
@@ -52,6 +62,8 @@ QVariantList CategoriesController::categoriesList() const {
         item["parentName"] = getParentCategoryName(cat.getParentId());
         item["active"] = cat.isActive();
         item["status"] = cat.isActive() ? "Active" : "Inactive";
+        item["totalAmount"] = totalAmount;
+        item["totalAmountFormatted"] = QLocale::system().toString(totalAmount, 'f', 0) + " VND";
 
         list.append(item);
     }

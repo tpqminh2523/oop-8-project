@@ -44,19 +44,19 @@ Rectangle {
 
             PageBox_1 {
                 boxTitle: "TOTAL SAVED"
-                amountText: "1,000 VND"
+                amountText: savingsController.totalSaved.toLocaleString(Qt.locale(), 'f', 0) + " VND"
                 labelText: "Across All Goals"
             }
 
             PageBox_1 {
                 boxTitle: "REMAINING"
-                amountText: "1,000 VND"
-                labelText: "To Reach All Target"
+                amountText: savingsController.totalRemaining.toLocaleString(Qt.locale(), 'f', 0) + " VND"
+                labelText: "To Reach All Targets"
             }
 
             PageBox_1 {
                 boxTitle: "COMPLETED"
-                amountText: "0 / 3"
+                amountText: savingsController.completedCount + " / " + savingsController.totalCount
                 labelText: "Goals Fully Funded"
             }
         }
@@ -89,6 +89,8 @@ Rectangle {
                         id: searchBar
                         placeholderText: "Search Saving"
                         Layout.preferredWidth: 260
+                        text: savingsController.searchKeyword
+                        onTextEdited: function(newText) { savingsController.searchKeyword = newText }
                     }
 
                     RowLayout {
@@ -96,19 +98,23 @@ Rectangle {
 
                         UniversalButton_1 {
                             buttonText: "All"
-                            _state: UniversalButton_1.State_1.State_1_selected
+                            _state: savingsController.priorityFilter === -1 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: savingsController.priorityFilter = -1
                         }
                         UniversalButton_1 {
                             buttonText: "High"
-                            _state: UniversalButton_1.State_1.State_1_default
+                            _state: savingsController.priorityFilter === 2 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: savingsController.priorityFilter = 2
                         }
                         UniversalButton_1 {
                             buttonText: "Medium"
-                            _state: UniversalButton_1.State_1.State_1_default
+                            _state: savingsController.priorityFilter === 1 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: savingsController.priorityFilter = 1
                         }
                         UniversalButton_1 {
                             buttonText: "Low"
-                            _state: UniversalButton_1.State_1.State_1_default
+                            _state: savingsController.priorityFilter === 0 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: savingsController.priorityFilter = 0
                         }
                     }
 
@@ -119,8 +125,20 @@ Rectangle {
                     }
 
                     Dropdown_1 {
-                        selectedText: "All Main Categories"
+                        id: categoryFilterDropdown
                         Layout.preferredWidth: 200
+
+                        property var allCats: categoriesController.categoriesList
+                        property var filteredCats: allCats.filter(function(c) { return c.parentId === 5; })
+                        property var catData: [{id: 0, name: "All Main Categories"}].concat(filteredCats)
+                        model: catData.map(function(c) { return c.name; })
+                        selectedText: "All Main Categories"
+
+                        onSelected: function(index, value) {
+                            if (index >= 0 && index < catData.length) {
+                                savingsController.categoryIdFilter = catData[index].id
+                            }
+                        }
                     }
 
                     Item {
@@ -128,10 +146,13 @@ Rectangle {
                     }
 
                     UniversalButton_1 {
-                        buttonText: "+Add Saving"
+                        buttonText: "+ Add Saving"
                         _state: UniversalButton_1.State_1.State_1_selected
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                        onClicked: console.log("Add Saving clicked")
+                        onClicked: {
+                            savingDialog.reset()
+                            savingDialog.open()
+                        }
                     }
                 }
             }
@@ -258,58 +279,92 @@ Rectangle {
                 clip: true
                 spacing: 0
 
-                model: ListModel {
-                    ListElement {
-                        sName: "Name"
-                        pVal: Priority_1.Priority_1.Priority_1_high
-                        cat: "Category"
-                        sText: "1,000 VND"
-                        gText: "/ 20,000 VND"
-                        pFrac: 0.67
-                        subT: "67% saved"
-                        dDate: "31/12/2012"
-                    }
-                    ListElement {
-                        sName: "Name"
-                        pVal: Priority_1.Priority_1.Priority_1_high
-                        cat: "Category"
-                        sText: "1,000 VND"
-                        gText: "/ 20,000 VND"
-                        pFrac: 0.67
-                        subT: "67% saved"
-                        dDate: "31/12/2012"
-                    }
-                    ListElement {
-                        sName: "Name"
-                        pVal: Priority_1.Priority_1.Priority_1_high
-                        cat: "Category"
-                        sText: "1,000 VND"
-                        gText: "/ 20,000 VND"
-                        pFrac: 0.67
-                        subT: "67% saved"
-                        dDate: "31/12/2012"
-                    }
-                }
+                boundsBehavior: Flickable.StopAtBounds
+
+                model: savingsController
 
                 delegate: SavingRow_1 {
                     width: listView.width
-                    savingName: model.sName
-                    priorityVal: model.pVal
-                    categoryText: model.cat
-                    savedText: model.sText
-                    goalText: model.gText
-                    progressFraction: model.pFrac
-                    progressSubText: model.subT
-                    dueDateText: model.dDate
+                    savingName: model.tName
+                    priorityVal: model.tPriority === 2 ? Priority_1.Priority_1.Priority_1_high
+                                 : (model.tPriority === 0 ? Priority_1.Priority_1.Priority_1_low : Priority_1.Priority_1.Priority_1_medium)
+                    categoryText: model.tCategory
+                    savedText: model.tCurrent
+                    goalText: "/ " + model.tTarget + " VND"
+                    progressFraction: model.tProgressFraction
+                    progressSubText: model.tProgressPercent
+                    dueDateText: model.tDueDate
 
-                    onEditClicked: console.log("Edit saving: " + model.sName)
-                    onDeleteClicked: console.log("Delete saving: " + model.sName)
+                    onEditClicked: {
+                        savingDialog.reset()
+                        savingDialog.isEditMode = true
+                        savingDialog.savingId = model.tId
+                        savingDialog.savingName = model.tName
+                        savingDialog.savingTarget = model.tTarget
+                        savingDialog.savingCurrent = model.tCurrent
+                        savingDialog.setPriority(model.tPriority)
+                        savingDialog.setCategoryId(model.tCategoryId)
+                        savingDialog.setDateStr(model.tDueDate)
+
+                        savingDialog.open()
+                    }
+                    onDeleteClicked: {
+                        deleteDialog.pendingDeleteId = model.tId
+                        deleteDialog.open()
+                    }
                 }
 
                 ScrollBar.vertical: ScrollBar {
                     policy: ScrollBar.AsNeeded
                 }
             }
+        }
+    }
+
+    SavingDialog {
+        id: savingDialog
+        anchors.fill: parent
+
+        onAccepted: {
+            var dueStr = savingDialog.dueDateField ? savingDialog.dueDateField.selectedDate : ""
+            var targetVal = parseFloat(savingDialog.savingTarget.replace(/,/g, '')) || 0.0
+            var currentVal = parseFloat(savingDialog.savingCurrent.replace(/,/g, '')) || 0.0
+
+            if (isEditMode) {
+                savingsController.updateSaving(
+                    savingId,
+                    savingName,
+                    savingPriority,
+                    savingCategoryId,
+                    targetVal,
+                    currentVal,
+                    dueStr
+                )
+            } else {
+                savingsController.addSaving(
+                    savingName,
+                    savingPriority,
+                    savingCategoryId,
+                    targetVal,
+                    currentVal,
+                    dueStr
+                )
+            }
+        }
+    }
+
+    DeleteDialog {
+        id: deleteDialog
+        property int pendingDeleteId: -1
+
+        onAccepted: {
+            if (pendingDeleteId !== -1) {
+                savingsController.deleteSaving(pendingDeleteId)
+                pendingDeleteId = -1
+            }
+        }
+        onRejected: {
+            pendingDeleteId = -1
         }
     }
 }

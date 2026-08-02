@@ -235,7 +235,7 @@ Rectangle {
                     width: listView.width
                     mainCategoryName: modelData.parentName
                     categoryName: modelData.name
-                    totalAmountText: "0 VND"
+                    totalAmountText: modelData.totalAmountFormatted
                     status_1: modelData.active ? CategoryRow_1.Status.Status_active : CategoryRow_1.Status.Status_inactive
 
                     onEditClicked: {

@@ -213,7 +213,7 @@ Rectangle {
                                     font.family: "Inter"
                                     font.pixelSize: 13
                                     color: "#94a3b8"
-                                    text: "Last Month"
+                                    text: "Last 6 Months"
                                 }
                             }
 
@@ -241,11 +241,30 @@ Rectangle {
                                             overviewCanvas.requestPaint()
                                         }
                                     }
+
+                                    function niceMax(v) {
+                                        if (v <= 0) return 1;
+                                        var magnitude = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+                                        var norm = v / magnitude;
+                                        var niceNorm;
+                                        if (norm <= 1) niceNorm = 1;
+                                        else if (norm <= 2) niceNorm = 2;
+                                        else if (norm <= 5) niceNorm = 5;
+                                        else niceNorm = 10;
+                                        return niceNorm * magnitude;
+                                    }
+
+                                    function formatShort(v) {
+                                        if (v >= 1000000) return (v / 1000000).toFixed((v % 1000000 === 0) ? 0 : 1) + "M";
+                                        if (v >= 1000) return (v / 1000).toFixed(0) + "K";
+                                        return v.toFixed(0);
+                                    }
+
                                     onPaint: {
                                         var ctx = getContext("2d");
                                         ctx.reset();
 
-                                        var padL = 42;
+                                        var padL = 46;
                                         var padB = 24;
                                         var padT = 15;
                                         var padR = 12;
@@ -253,7 +272,21 @@ Rectangle {
                                         var chartW = width - padL - padR;
                                         var chartH = height - padT - padB;
 
-                                        // Y-Axis Value Labels & Gridlines
+                                        // Real last-6-months data from OverviewController (was a hardcoded Jan-Jun mock)
+                                        var trend = overviewController.monthlyIncomeExpense;
+                                        var months = [];
+                                        var incomeVals = [];
+                                        var expenseVals = [];
+                                        var maxVal = 0;
+                                        for (var i = 0; i < trend.length; i++) {
+                                            months.push(trend[i].month);
+                                            incomeVals.push(trend[i].income);
+                                            expenseVals.push(trend[i].expense);
+                                            maxVal = Math.max(maxVal, trend[i].income, trend[i].expense);
+                                        }
+                                        var axisMax = niceMax(maxVal);
+
+                                        // Y-Axis Value Labels & Gridlines (auto-scaled to the real data)
                                         ctx.font = "11px 'Inter', sans-serif";
                                         ctx.fillStyle = "#94a3b8";
                                         ctx.textAlign = "right";
@@ -261,15 +294,14 @@ Rectangle {
                                         ctx.strokeStyle = "#f1f5f9";
                                         ctx.lineWidth = 1;
 
-                                        var yTicks = ["20M", "15M", "10M", "5M", "0"];
-                                        for (var i = 0; i < yTicks.length; i++) {
-                                            var ratio = i / (yTicks.length - 1);
+                                        var tickCount = 5;
+                                        for (var tIdx = 0; tIdx < tickCount; tIdx++) {
+                                            var ratio = tIdx / (tickCount - 1);
+                                            var val = axisMax * (1 - ratio);
                                             var y = padT + ratio * chartH;
 
-                                            // Value Label on Left
-                                            ctx.fillText(yTicks[i], padL - 8, y);
+                                            ctx.fillText(formatShort(val), padL - 8, y);
 
-                                            // Grid Line
                                             ctx.beginPath();
                                             ctx.moveTo(padL, y);
                                             ctx.lineTo(width - padR, y);
@@ -277,12 +309,8 @@ Rectangle {
                                         }
 
                                         // X-Axis Month Labels & Bars
-                                        var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-                                        var incomeRatios = [0.65, 0.50, 0.80, 0.55, 0.85, 0.70];
-                                        var expenseRatios = [0.40, 0.55, 0.45, 0.60, 0.35, 0.50];
-
                                         var count = months.length;
-                                        var groupWidth = chartW / count;
+                                        var groupWidth = count > 0 ? chartW / count : chartW;
                                         var barWidth = Math.min(22, groupWidth * 0.32);
 
                                         ctx.textAlign = "center";
@@ -293,8 +321,8 @@ Rectangle {
                                             var xInc = groupCenterX - barWidth - 1;
                                             var xExp = groupCenterX + 1;
 
-                                            var hInc = incomeRatios[b] * chartH;
-                                            var hExp = expenseRatios[b] * chartH;
+                                            var hInc = (incomeVals[b] / axisMax) * chartH;
+                                            var hExp = (expenseVals[b] / axisMax) * chartH;
 
                                             var yInc = padT + chartH - hInc;
                                             var yExp = padT + chartH - hExp;
@@ -314,6 +342,7 @@ Rectangle {
                                     }
                                     onWidthChanged: requestPaint()
                                     onHeightChanged: requestPaint()
+                                    Component.onCompleted: requestPaint()
                                 }
                             }
 

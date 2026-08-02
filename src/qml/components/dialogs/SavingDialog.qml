@@ -11,8 +11,81 @@ Item {
     signal accepted()
     signal rejected()
 
+    property bool isEditMode: false
+    property int savingId: -1
+    property string savingName: ""
+    property int savingPriority: 1 // 0=Low, 1=Medium, 2=High (matches C++ Priority enum)
+    property int savingCategoryId: 0
+    property string savingCurrent: "" // "Amount Funded" so far
+    property string savingTarget: "" // "Save Goal"
+    property alias dueDateField: date_Input_Field
+    property bool isValidating: false
+
+    readonly property var priorityNames: ["Low", "Medium", "High"]
+
+    function parseDMY(str) {
+        if (!str) return null
+        var parts = str.split("/")
+        if (parts.length !== 3) return null
+        var d = parseInt(parts[0]), m = parseInt(parts[1]), y = parseInt(parts[2])
+        if (isNaN(d) || isNaN(m) || isNaN(y)) return null
+        return new Date(y, m - 1, d)
+    }
+
+    function setDateStr(dateStr) {
+        var s = parseDMY(dateStr)
+        if (s) date_Input_Field.setDate(s.getDate(), s.getMonth() + 1, s.getFullYear())
+    }
+
+    function setCategoryId(catId) {
+        var allCats = categoriesController.categoriesList
+        var list = allCats.filter(function(c) { return c.parentId === 5 })
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === catId) {
+                dropdown_3.selectedIndex = i
+                dropdown_3.selectedText = list[i].name
+                savingCategoryId = list[i].id
+                return
+            }
+        }
+        if (list.length > 0) {
+            dropdown_3.selectedIndex = 0
+            dropdown_3.selectedText = list[0].name
+            savingCategoryId = list[0].id
+        }
+    }
+
+    function setPriority(p) {
+        savingPriority = p
+        dropdown_1.selectedIndex = p
+        dropdown_1.selectedText = priorityNames[p]
+    }
+
     function open() { visible = true }
     function close() { visible = false }
+
+    function reset() {
+        isEditMode = false
+        savingId = -1
+        savingName = ""
+        savingCurrent = ""
+        savingTarget = ""
+        isValidating = false
+        textField.text = ""
+        date_Input_Field.clear()
+        setPriority(1) // Medium
+
+        var allCats = categoriesController.categoriesList
+        var list = allCats.filter(function(c) { return c.parentId === 5 })
+        if (list.length > 0) {
+            dropdown_3.selectedIndex = 0
+            dropdown_3.selectedText = list[0].name
+            savingCategoryId = list[0].id
+        } else {
+            savingCategoryId = 0
+            dropdown_3.selectedText = "Select Category"
+        }
+    }
 
     // Dimmed background overlay
     Rectangle {
@@ -59,7 +132,7 @@ Item {
                 horizontalAlignment: Text.AlignLeft
                 lineHeight: 32
                 lineHeightMode: Text.FixedHeight
-                text: "Add Saving"
+                text: root.isEditMode ? "Edit Saving" : "Add Saving"
                 textFormat: Text.PlainText
                 verticalAlignment: Text.AlignTop
                 wrapMode: Text.Wrap
@@ -100,6 +173,8 @@ Item {
                 width: 460
                 color: "#e9e9e9"
                 radius: 10
+                border.color: (root.isValidating && root.savingName.trim() === "") ? "red" : "transparent"
+                border.width: (root.isValidating && root.savingName.trim() === "") ? 1 : 0
 
                 TextInput {
                     id: textField
@@ -113,9 +188,12 @@ Item {
                     font.weight: Font.Normal
                     clip: true
                     selectByMouse: true
+                    maximumLength: 40
+                    text: root.savingName
+                    onTextChanged: root.savingName = text
 
                     Text {
-                        text: "input text"
+                        text: "e.g. Emergency Fund"
                         color: "#8049454f"
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
@@ -166,6 +244,12 @@ Item {
                     width: 225
                     _state: Dropdown_1.State_1.State_1_default
                     clip: true
+                    model: root.priorityNames
+                    selectedText: root.priorityNames[root.savingPriority]
+
+                    onSelected: function(index, value) {
+                        root.savingPriority = index
+                    }
                 }
             }
 
@@ -201,10 +285,20 @@ Item {
                     width: 225
                     _state: Dropdown_1.State_1.State_1_default
                     clip: true
+
+                    property var allCats: categoriesController.categoriesList
+                    property var catList: allCats.filter(function(c) { return c.parentId === 5 })
+                    model: catList.map(function(c) { return c.name })
+
+                    onSelected: function(index, value) {
+                        if (index >= 0 && index < catList.length) {
+                            root.savingCategoryId = catList[index].id
+                        }
+                    }
                 }
             }
 
-            // Amount Funded Input
+            // Amount Funded Input (current saved amount - editable)
             Rectangle {
                 id: dropdown_4
                 x: 20
@@ -251,9 +345,20 @@ Item {
                         clip: true
                         selectByMouse: true
                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        text: root.savingCurrent
+                        onTextChanged: {
+                            if (activeFocus) {
+                                var raw = text.replace(/[^0-9]/g, "")
+                                var formatted = raw.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                                if (text !== formatted) {
+                                    text = formatted
+                                }
+                                root.savingCurrent = formatted
+                            }
+                        }
 
                         Text {
-                            text: "input text"
+                            text: "0"
                             color: "#8049454f"
                             font: parent.font
                             visible: !parent.text && !parent.activeFocus
@@ -264,7 +369,7 @@ Item {
                 }
             }
 
-            // Save Goal Input
+            // Save Goal Input (target amount)
             Rectangle {
                 id: dropdown_5
                 x: 255
@@ -297,6 +402,8 @@ Item {
                     width: 225
                     color: "#e9e9e9"
                     radius: 10
+                    border.color: (root.isValidating && root.savingTarget.trim() === "") ? "red" : "transparent"
+                    border.width: (root.isValidating && root.savingTarget.trim() === "") ? 1 : 0
 
                     TextInput {
                         id: supporting_text_1
@@ -311,9 +418,20 @@ Item {
                         clip: true
                         selectByMouse: true
                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        text: root.savingTarget
+                        onTextChanged: {
+                            if (activeFocus) {
+                                var raw = text.replace(/[^0-9]/g, "")
+                                var formatted = raw.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                                if (text !== formatted) {
+                                    text = formatted
+                                }
+                                root.savingTarget = formatted
+                            }
+                        }
 
                         Text {
-                            text: "input text"
+                            text: "0"
                             color: "#8049454f"
                             font: parent.font
                             visible: !parent.text && !parent.activeFocus
@@ -357,6 +475,8 @@ Item {
                 y: 32
                 height: 42
                 width: 460
+                border.color: (root.isValidating && date_Input_Field.selectedDate.trim() === "") ? "red" : "transparent"
+                border.width: (root.isValidating && date_Input_Field.selectedDate.trim() === "") ? 1 : 0
             }
         }
 
@@ -389,7 +509,7 @@ Item {
                 id: saveButton
                 x: 405
                 y: 9
-                buttonText: "Add"
+                buttonText: root.isEditMode ? "Save" : "Add"
                 height: 35
                 width: 75
                 _state: UniversalButton_1.State_1.State_1_selected
@@ -398,6 +518,11 @@ Item {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
+                        root.isValidating = true
+                        if (root.savingName.trim() === "" || root.savingTarget.trim() === ""
+                            || date_Input_Field.selectedDate.trim() === "" || root.savingCategoryId === 0) {
+                            return
+                        }
                         root.accepted()
                         root.close()
                     }

@@ -25,7 +25,7 @@ void DatabaseManager::loadSavingsFromCSV()
         if (line.trimmed().isEmpty())
             continue;
 
-        // Cấu trúc 1 dòng: id;name;dueDate;target;current;categoryId
+        // Cấu trúc 1 dòng: id;name;dueDate;target;current;categoryId;priority
         QStringList f = line.split(';');
         if (f.size() < 6)
             continue;
@@ -36,8 +36,10 @@ void DatabaseManager::loadSavingsFromCSV()
         double target     = f[3].toDouble();
         double current    = f[4].toDouble();
         int categoryId    = f[5].toInt();
+        // priority là cột mới thêm sau -> có thể vắng mặt ở các dòng dữ liệu cũ, mặc định Medium
+        Priority priority = (f.size() >= 7) ? static_cast<Priority>(f[6].toInt()) : Priority::Medium;
 
-        m_savings.append(Saving(id, name, dueDate, target, current, categoryId));
+        m_savings.append(Saving(id, name, dueDate, target, current, categoryId, priority));
     }
     file.close();
 
@@ -45,8 +47,8 @@ void DatabaseManager::loadSavingsFromCSV()
     if (m_savings.isEmpty()) {
         QDate today = QDate::currentDate();
 
-        m_savings.append(Saving(1, "Emergency Fund", today.addMonths(6), 10000000.0, 4500000.0, 17));
-        m_savings.append(Saving(2, "Summer Vacation Fund", today.addMonths(3), 5000000.0, 2000000.0, 18));
+        m_savings.append(Saving(1, "Emergency Fund", today.addMonths(6), 10000000.0, 4500000.0, 17, Priority::High));
+        m_savings.append(Saving(2, "Summer Vacation Fund", today.addMonths(3), 5000000.0, 2000000.0, 18, Priority::Medium));
 
         saveSavingsToCSV();
     }
@@ -68,7 +70,8 @@ void DatabaseManager::saveSavingsToCSV() const
             << s.getDueDate().toString(Qt::ISODate) << ";"
             << s.getTarget() << ";"
             << s.getCurrent() << ";"
-            << s.getCategoryId() << "\n";
+            << s.getCategoryId() << ";"
+            << static_cast<int>(s.getPriority()) << "\n";
     }
     file.close();
     const_cast<DatabaseManager*>(this)->emit dataChanged();
@@ -82,11 +85,31 @@ int DatabaseManager::generateNextSavingId() const
     return maxId + 1;
 }
 
-void DatabaseManager::addSaving(const QString& name, const QDate& dueDate, double target)
+void DatabaseManager::addSaving(const QString& name, const QDate& dueDate, double target, int categoryId,
+                                 Priority priority, double current)
 {
     int newId = generateNextSavingId();
-    m_savings.append(Saving(newId, name, dueDate, target, 0.0, Saving::parentCategory));
+    int catId = (categoryId == 0) ? Saving::parentCategory : categoryId;
+    m_savings.append(Saving(newId, name, dueDate, target, current, catId, priority));
     saveSavingsToCSV();
+}
+
+bool DatabaseManager::updateSaving(int savingId, const QString& name, const QDate& dueDate, double target,
+                                    int categoryId, Priority priority, double current)
+{
+    for (Saving& s : m_savings) {
+        if (s.getId() == savingId) {
+            s.setName(name);
+            s.setDueDate(dueDate);
+            s.setTarget(target);
+            s.setCategoryId(categoryId == 0 ? Saving::parentCategory : categoryId);
+            s.setPriority(priority);
+            s.setCurrent(current); // full edit - unlike contributeToSaving this can also decrease the amount
+            saveSavingsToCSV();
+            return true;
+        }
+    }
+    return false;
 }
 
 bool DatabaseManager::contributeToSaving(int savingId, double amount)

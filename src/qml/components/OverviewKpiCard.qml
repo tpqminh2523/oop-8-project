@@ -35,6 +35,7 @@ ColumnLayout {
             text: root.cardTitle
             Layout.fillWidth: true
             verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
         }
 
         View_all_1 {
@@ -64,7 +65,8 @@ ColumnLayout {
                 Layout.fillHeight: true
                 spacing: 16
 
-                // Amount Text
+                // Amount Text (protected: keeps its size as long as possible, only
+                // elides as a last resort so the figure itself is never cut off silently)
                 Text {
                     font.family: "Inter"
                     font.pixelSize: 26
@@ -72,9 +74,12 @@ ColumnLayout {
                     color: "#191919"
                     text: root.amountText
                     verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                    Layout.minimumWidth: 60
+                    Layout.maximumWidth: implicitWidth
                 }
 
-                // Date Text
+                // Date Text (shrinks/elides first, before the amount or trend badge give up space)
                 Text {
                     font.family: "Inter"
                     font.pixelSize: 14
@@ -82,6 +87,10 @@ ColumnLayout {
                     color: "#878787"
                     text: root.dateText
                     verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    Layout.maximumWidth: implicitWidth
                 }
 
                 // Spacer pushing trend badge to right edge

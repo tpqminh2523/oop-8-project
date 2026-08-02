@@ -44,20 +44,20 @@ Rectangle {
 
             PageBox_1 {
                 boxTitle: "TOTAL SPENT"
-                amountText: "1,000 VND"
+                amountText: budgetsController.totalSpent.toLocaleString(Qt.locale(), 'f', 0) + " VND"
                 labelText: "Across All Budgets"
             }
 
             PageBox_1 {
                 boxTitle: "TOTAL LIMIT"
-                amountText: "1,000 VND"
-                labelText: "Across All Budgets"
+                amountText: budgetsController.totalLimit.toLocaleString(Qt.locale(), 'f', 0) + " VND"
+                labelText: "Combined Limit"
             }
 
             PageBox_1 {
                 boxTitle: "REMAINING"
-                amountText: "1,000 VND"
-                labelText: "Available To Spend"
+                amountText: budgetsController.totalRemaining.toLocaleString(Qt.locale(), 'f', 0) + " VND"
+                labelText: "Still Available"
             }
         }
 
@@ -69,7 +69,7 @@ Rectangle {
             Layout.fillHeight: true
             spacing: 0
 
-            // A. Table Toolbar (Search, Priority Tabs, Dropdown, Add Budget)
+            // A. Table Toolbar (Search, Priority filter, Category dropdown, Add Budget)
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: 70
@@ -87,8 +87,10 @@ Rectangle {
 
                     SearchBar_1 {
                         id: searchBar
-                        placeholderText: "Search Budget"
+                        placeholderText: "Search budget name"
                         Layout.preferredWidth: 260
+                        text: budgetsController.searchKeyword
+                        onTextEdited: function(newText) { budgetsController.searchKeyword = newText }
                     }
 
                     RowLayout {
@@ -96,19 +98,23 @@ Rectangle {
 
                         UniversalButton_1 {
                             buttonText: "All"
-                            _state: UniversalButton_1.State_1.State_1_selected
+                            _state: budgetsController.priorityFilter === -1 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: budgetsController.priorityFilter = -1
                         }
                         UniversalButton_1 {
                             buttonText: "High"
-                            _state: UniversalButton_1.State_1.State_1_default
+                            _state: budgetsController.priorityFilter === 2 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: budgetsController.priorityFilter = 2
                         }
                         UniversalButton_1 {
                             buttonText: "Medium"
-                            _state: UniversalButton_1.State_1.State_1_default
+                            _state: budgetsController.priorityFilter === 1 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: budgetsController.priorityFilter = 1
                         }
                         UniversalButton_1 {
                             buttonText: "Low"
-                            _state: UniversalButton_1.State_1.State_1_default
+                            _state: budgetsController.priorityFilter === 0 ? UniversalButton_1.State_1.State_1_selected : UniversalButton_1.State_1.State_1_default
+                            onClicked: budgetsController.priorityFilter = 0
                         }
                     }
 
@@ -119,8 +125,20 @@ Rectangle {
                     }
 
                     Dropdown_1 {
-                        selectedText: "All Main Categories"
+                        id: categoryFilterDropdown
                         Layout.preferredWidth: 200
+
+                        property var allCats: categoriesController.categoriesList
+                        property var filteredCats: allCats.filter(function(c) { return c.parentId === 4; })
+                        property var catData: [{id: 0, name: "All Main Categories"}].concat(filteredCats)
+                        model: catData.map(function(c) { return c.name; })
+                        selectedText: "All Main Categories"
+
+                        onSelected: function(index, value) {
+                            if (index >= 0 && index < catData.length) {
+                                budgetsController.categoryIdFilter = catData[index].id
+                            }
+                        }
                     }
 
                     Item {
@@ -128,15 +146,18 @@ Rectangle {
                     }
 
                     UniversalButton_1 {
-                        buttonText: "+Add Budget"
+                        buttonText: "+ Add Budget"
                         _state: UniversalButton_1.State_1.State_1_selected
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                        onClicked: console.log("Add Budget clicked")
+                        onClicked: {
+                            budgetDialog.reset()
+                            budgetDialog.open()
+                        }
                     }
                 }
             }
 
-            // B. Table Column Header Bar (Exact matching BudgetRow_1 columns)
+            // B. Table Column Header Bar (matching BudgetRow_1 column widths exactly)
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: 48
@@ -150,7 +171,6 @@ Rectangle {
                     anchors.rightMargin: 20
                     spacing: 0
 
-                    // 1. BUDGET
                     Item {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 200
@@ -167,7 +187,6 @@ Rectangle {
                         }
                     }
 
-                    // 2. PRIORITY
                     Item {
                         Layout.preferredWidth: 140
                         Layout.fillHeight: true
@@ -183,7 +202,6 @@ Rectangle {
                         }
                     }
 
-                    // 3. CATEGORY
                     Item {
                         Layout.preferredWidth: 160
                         Layout.fillHeight: true
@@ -199,7 +217,6 @@ Rectangle {
                         }
                     }
 
-                    // 4. PROGRESS
                     Item {
                         Layout.preferredWidth: 280
                         Layout.fillHeight: true
@@ -215,7 +232,6 @@ Rectangle {
                         }
                     }
 
-                    // 5. DATE & CYCLE
                     Item {
                         Layout.preferredWidth: 240
                         Layout.fillHeight: true
@@ -231,7 +247,6 @@ Rectangle {
                         }
                     }
 
-                    // 6. ACTIONS
                     Item {
                         Layout.preferredWidth: 100
                         Layout.fillHeight: true
@@ -250,7 +265,7 @@ Rectangle {
                 }
             }
 
-            // C. Dynamic Row ListView
+            // C. Dynamic Data Rows Container
             ListView {
                 id: listView
                 Layout.fillWidth: true
@@ -258,66 +273,94 @@ Rectangle {
                 clip: true
                 spacing: 0
 
-                model: ListModel {
-                    ListElement {
-                        bName: "Name"
-                        pVal: Priority_1.Priority_1.Priority_1_medium
-                        cat: "Category"
-                        sText: "1,000 VND"
-                        lText: "/ 20,000 VND"
-                        pFrac: 0.67
-                        subT: "67% saved"
-                        sDate: "31/12/2012"
-                        eDate: "31/12/2013"
-                        perVal: DateCycle_1.Period.Period_yearly
-                    }
-                    ListElement {
-                        bName: "Name"
-                        pVal: Priority_1.Priority_1.Priority_1_medium
-                        cat: "Category"
-                        sText: "1,000 VND"
-                        lText: "/ 20,000 VND"
-                        pFrac: 0.67
-                        subT: "67% saved"
-                        sDate: "31/12/2012"
-                        eDate: "31/12/2013"
-                        perVal: DateCycle_1.Period.Period_yearly
-                    }
-                    ListElement {
-                        bName: "Name"
-                        pVal: Priority_1.Priority_1.Priority_1_medium
-                        cat: "Category"
-                        sText: "1,000 VND"
-                        lText: "/ 20,000 VND"
-                        pFrac: 0.67
-                        subT: "67% saved"
-                        sDate: "31/12/2012"
-                        eDate: "31/12/2013"
-                        perVal: DateCycle_1.Period.Period_yearly
-                    }
-                }
+                boundsBehavior: Flickable.StopAtBounds
+
+                model: budgetsController
 
                 delegate: BudgetRow_1 {
                     width: listView.width
-                    budgetName: model.bName
-                    priorityVal: model.pVal
-                    categoryText: model.cat
-                    spentText: model.sText
-                    limitText: model.lText
-                    progressFraction: model.pFrac
-                    progressSubText: model.subT
-                    startDate: model.sDate
-                    endDate: model.eDate
-                    periodVal: model.perVal
+                    budgetName: model.tName
+                    priorityVal: model.tPriority === 2 ? Priority_1.Priority_1.Priority_1_high
+                                 : (model.tPriority === 0 ? Priority_1.Priority_1.Priority_1_low : Priority_1.Priority_1.Priority_1_medium)
+                    categoryText: model.tCategory
+                    spentText: model.tSpent
+                    limitText: "/ " + model.tLimit + " VND"
+                    progressFraction: model.tProgressFraction
+                    progressSubText: model.tProgressPercent
+                    startDate: model.tStartDate
+                    endDate: model.tEndDate
+                    periodVal: model.tPeriod
 
-                    onEditClicked: console.log("Edit budget: " + model.bName)
-                    onDeleteClicked: console.log("Delete budget: " + model.bName)
+                    onEditClicked: {
+                        budgetDialog.reset()
+                        budgetDialog.isEditMode = true
+                        budgetDialog.budgetId = model.tId
+                        budgetDialog.budgetName = model.tName
+                        budgetDialog.budgetLimit = model.tLimit
+                        budgetDialog.budgetSpent = model.tSpent
+                        budgetDialog.setPriority(model.tPriority)
+                        budgetDialog.setCategoryId(model.tCategoryId)
+                        budgetDialog.setDateStrs(model.tStartDate, model.tEndDate)
+
+                        budgetDialog.open()
+                    }
+                    onDeleteClicked: {
+                        deleteDialog.pendingDeleteId = model.tId
+                        deleteDialog.open()
+                    }
                 }
 
                 ScrollBar.vertical: ScrollBar {
                     policy: ScrollBar.AsNeeded
                 }
             }
+        }
+    }
+
+    BudgetDialog {
+        id: budgetDialog
+        anchors.fill: parent
+
+        onAccepted: {
+            var startStr = budgetDialog.startDateField ? budgetDialog.startDateField.selectedDate : ""
+            var endStr = budgetDialog.endDateField ? budgetDialog.endDateField.selectedDate : ""
+            var limitVal = parseFloat(budgetDialog.budgetLimit.replace(/,/g, '')) || 0.0
+
+            if (isEditMode) {
+                budgetsController.updateBudget(
+                    budgetId,
+                    budgetName,
+                    budgetPriority,
+                    budgetCategoryId,
+                    limitVal,
+                    startStr,
+                    endStr
+                )
+            } else {
+                budgetsController.addBudget(
+                    budgetName,
+                    budgetPriority,
+                    budgetCategoryId,
+                    limitVal,
+                    startStr,
+                    endStr
+                )
+            }
+        }
+    }
+
+    DeleteDialog {
+        id: deleteDialog
+        property int pendingDeleteId: -1
+
+        onAccepted: {
+            if (pendingDeleteId !== -1) {
+                budgetsController.deleteBudget(pendingDeleteId)
+                pendingDeleteId = -1
+            }
+        }
+        onRejected: {
+            pendingDeleteId = -1
         }
     }
 }

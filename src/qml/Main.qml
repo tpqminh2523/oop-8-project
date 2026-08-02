@@ -17,9 +17,15 @@ Window {
 
     visibility: Window.Maximized
 
+    // Debug-only dialog preview bar. Hidden by default; only shown when the app
+    // is launched with `--debug-dialogs` (e.g. `FManagement --debug-dialogs`).
+    // This used to be shown unconditionally and covered the bottom-left of every page.
+    readonly property bool debugDialogsEnabled: Qt.application.arguments.indexOf("--debug-dialogs") !== -1
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
+        visible: sessionController.isLoggedIn
 
         // 1. SIDEBAR NAVIGATION MENU
         Sidebar_menu_1 {
@@ -48,5 +54,25 @@ Window {
         }
     }
 
-    DialogTestOverlay {} //Cái này chỉ để "preview" mấy cái dialog trông như thế nào thôi, nếu không cần nữa chỉ cần đóng comment nó lại.
+    // Login screen - shown first, before any app content, until sessionController
+    // reports a successful login. Also shown again immediately after logout.
+    LoginPage {
+        anchors.fill: parent
+        visible: !sessionController.isLoggedIn
+
+        Connections {
+            target: sessionController
+            function onLoggedInChanged() {
+                if (sessionController.isLoggedIn) {
+                    sidebarMenu.selectedIndex = 0 // always land on Overview after login
+                }
+            }
+        }
+    }
+
+    // Dialog preview overlay - for developers to eyeball dialog styling only.
+    // Only visible with --debug-dialogs so it never ships on top of the real UI.
+    DialogTestOverlay {
+        visible: mainWindow.debugDialogsEnabled
+    }
 }

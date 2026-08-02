@@ -281,6 +281,63 @@ QVariantList ReportsController::categoryIncomeReport() const {
     return result;
 }
 
+QVariantList ReportsController::monthlyIncomeExpense() const {
+    QVariantList list;
+    const auto& transactions = DatabaseManager::instance().getAllTransactions();
+    QDate today = QDate::currentDate();
+
+    // Real last-6-months income/expense totals, oldest -> newest. Replaces the
+    // hardcoded Jan-Jun mock array that used to be identical to Overview's.
+    for (int i = 5; i >= 0; --i) {
+        QDate monthDate = today.addMonths(-i);
+        int y = monthDate.year();
+        int m = monthDate.month();
+
+        double income = 0.0, expense = 0.0;
+        for (const Transaction* t : transactions) {
+            if (!t) continue;
+            QDate tDate = t->getDateTime().date();
+            if (tDate.year() == y && tDate.month() == m) {
+                if (t->getSignedAmount() > 0) income += t->getAmount();
+                else expense += t->getAmount();
+            }
+        }
+
+        QVariantMap entry;
+        entry["month"] = QDate(y, m, 1).toString("MMM");
+        entry["income"] = income;
+        entry["expense"] = expense;
+        list.append(entry);
+    }
+    return list;
+}
+
+QVariantList ReportsController::netWorthTrend() const {
+    QVariantList list;
+    const auto& transactions = DatabaseManager::instance().getAllTransactions();
+    QDate today = QDate::currentDate();
+
+    // Real cumulative running balance (net worth) as of the end of each of the
+    // last 6 months. Replaces the hardcoded mock "nwRatios" array.
+    for (int i = 5; i >= 0; --i) {
+        QDate monthDate = today.addMonths(-i);
+        QDate monthEnd(monthDate.year(), monthDate.month(), monthDate.daysInMonth());
+
+        double runningBalance = 0.0;
+        for (const Transaction* t : transactions) {
+            if (t && t->getDateTime().date() <= monthEnd) {
+                runningBalance += t->getSignedAmount();
+            }
+        }
+
+        QVariantMap entry;
+        entry["month"] = QDate(monthDate.year(), monthDate.month(), 1).toString("MMM");
+        entry["netWorth"] = runningBalance;
+        list.append(entry);
+    }
+    return list;
+}
+
 void ReportsController::refresh() {
     emit reportChanged();
 }

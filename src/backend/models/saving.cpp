@@ -2,14 +2,15 @@
 #include <algorithm>
 
 Saving::Saving()
-    : id(0), categoryId(parentCategory), name(""), targetAmount(0.0), currentAmount(0.0), dueDate(QDate())
+    : id(0), categoryId(parentCategory), name(""), priority(Priority::Medium), targetAmount(0.0), currentAmount(0.0), dueDate(QDate())
 {
 }
 
-Saving::Saving(int n_id, const QString& n_name, const QDate& n_dueDate, double n_target, double n_current, int n_categoryid)
+Saving::Saving(int n_id, const QString& n_name, const QDate& n_dueDate, double n_target, double n_current, int n_categoryid, Priority n_priority)
     : id(n_id),
     categoryId(n_categoryid == 0 ? parentCategory : n_categoryid),
     name(n_name),
+    priority(n_priority),
     targetAmount(n_target),
     currentAmount(n_current),
     dueDate(n_dueDate)
@@ -26,11 +27,23 @@ void Saving::setName(const QString& n_name)
     name = n_name;
 }
 
+void Saving::setPriority(Priority n_priority)
+{
+    priority = n_priority;
+}
+
 void Saving::setTarget(double n_target)
 {
     if (n_target < 0)
         return;
     targetAmount = n_target;
+}
+
+void Saving::setCurrent(double n_current)
+{
+    if (n_current < 0)
+        return;
+    currentAmount = n_current > targetAmount ? targetAmount : n_current;
 }
 
 void Saving::setDueDate(const QDate& n_dueDate)

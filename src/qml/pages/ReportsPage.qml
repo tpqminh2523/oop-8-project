@@ -209,15 +209,49 @@ Rectangle {
                                             rptBarCanvas.requestPaint()
                                         }
                                     }
+
+                                    function niceMax(v) {
+                                        if (v <= 0) return 1;
+                                        var magnitude = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+                                        var norm = v / magnitude;
+                                        var niceNorm;
+                                        if (norm <= 1) niceNorm = 1;
+                                        else if (norm <= 2) niceNorm = 2;
+                                        else if (norm <= 5) niceNorm = 5;
+                                        else niceNorm = 10;
+                                        return niceNorm * magnitude;
+                                    }
+
+                                    function formatShort(v) {
+                                        if (v >= 1000000) return (v / 1000000).toFixed((v % 1000000 === 0) ? 0 : 1) + "M";
+                                        if (v >= 1000) return (v / 1000).toFixed(0) + "K";
+                                        return v.toFixed(0);
+                                    }
+
                                     onPaint: {
                                         var ctx = getContext("2d");
                                         ctx.reset();
 
-                                        var padL = 42, padB = 24, padT = 15, padR = 12;
+                                        var padL = 46, padB = 24, padT = 15, padR = 12;
                                         var chartW = width - padL - padR;
                                         var chartH = height - padT - padB;
 
-                                        // Y-Axis Value Labels & Gridlines
+                                        // Real last-6-months data from ReportsController (was a hardcoded Jan-Jun mock,
+                                        // identical to the one on Overview)
+                                        var trend = reportsController.monthlyIncomeExpense;
+                                        var months = [];
+                                        var incomeVals = [];
+                                        var expenseVals = [];
+                                        var maxVal = 0;
+                                        for (var i = 0; i < trend.length; i++) {
+                                            months.push(trend[i].month);
+                                            incomeVals.push(trend[i].income);
+                                            expenseVals.push(trend[i].expense);
+                                            maxVal = Math.max(maxVal, trend[i].income, trend[i].expense);
+                                        }
+                                        var axisMax = niceMax(maxVal);
+
+                                        // Y-Axis Value Labels & Gridlines (auto-scaled to the real data)
                                         ctx.font = "11px 'Inter', sans-serif";
                                         ctx.fillStyle = "#94a3b8";
                                         ctx.textAlign = "right";
@@ -225,11 +259,12 @@ Rectangle {
                                         ctx.strokeStyle = "#f1f5f9";
                                         ctx.lineWidth = 1;
 
-                                        var yTicks = ["20M", "15M", "10M", "5M", "0"];
-                                        for (var i = 0; i < yTicks.length; i++) {
-                                            var ratio = i / (yTicks.length - 1);
+                                        var tickCount = 5;
+                                        for (var tIdx = 0; tIdx < tickCount; tIdx++) {
+                                            var ratio = tIdx / (tickCount - 1);
+                                            var val = axisMax * (1 - ratio);
                                             var y = padT + ratio * chartH;
-                                            ctx.fillText(yTicks[i], padL - 8, y);
+                                            ctx.fillText(formatShort(val), padL - 8, y);
 
                                             ctx.beginPath();
                                             ctx.moveTo(padL, y);
@@ -238,12 +273,8 @@ Rectangle {
                                         }
 
                                         // Bars & X-Axis Labels
-                                        var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-                                        var incomeRatios = [0.65, 0.50, 0.80, 0.55, 0.85, 0.70];
-                                        var expenseRatios = [0.40, 0.55, 0.45, 0.60, 0.35, 0.50];
-
                                         var count = months.length;
-                                        var groupWidth = chartW / count;
+                                        var groupWidth = count > 0 ? chartW / count : chartW;
                                         var barWidth = Math.min(20, groupWidth * 0.30);
 
                                         ctx.textAlign = "center";
@@ -254,8 +285,8 @@ Rectangle {
                                             var xInc = groupCenterX - barWidth - 1;
                                             var xExp = groupCenterX + 1;
 
-                                            var hInc = incomeRatios[b] * chartH;
-                                            var hExp = expenseRatios[b] * chartH;
+                                            var hInc = (incomeVals[b] / axisMax) * chartH;
+                                            var hExp = (expenseVals[b] / axisMax) * chartH;
 
                                             ctx.fillStyle = "#10b981";
                                             ctx.fillRect(xInc, padT + chartH - hInc, barWidth, hInc);
@@ -269,6 +300,7 @@ Rectangle {
                                     }
                                     onWidthChanged: requestPaint()
                                     onHeightChanged: requestPaint()
+                                    Component.onCompleted: requestPaint()
                                 }
                             }
 
@@ -351,15 +383,57 @@ Rectangle {
                                             rptNwCanvas.requestPaint()
                                         }
                                     }
+
+                                    function niceMax(v) {
+                                        if (v <= 0) return 1;
+                                        var magnitude = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+                                        var norm = v / magnitude;
+                                        var niceNorm;
+                                        if (norm <= 1) niceNorm = 1;
+                                        else if (norm <= 2) niceNorm = 2;
+                                        else if (norm <= 5) niceNorm = 5;
+                                        else niceNorm = 10;
+                                        return niceNorm * magnitude;
+                                    }
+
+                                    function formatShort(v) {
+                                        var sign = v < 0 ? "-" : "";
+                                        var av = Math.abs(v);
+                                        if (av >= 1000000) return sign + (av / 1000000).toFixed((av % 1000000 === 0) ? 0 : 1) + "M";
+                                        if (av >= 1000) return sign + (av / 1000).toFixed(0) + "K";
+                                        return sign + av.toFixed(0);
+                                    }
+
                                     onPaint: {
                                         var ctx = getContext("2d");
                                         ctx.reset();
 
-                                        var padL = 42, padB = 24, padT = 15, padR = 12;
+                                        var padL = 46, padB = 24, padT = 15, padR = 12;
                                         var chartW = width - padL - padR;
                                         var chartH = height - padT - padB;
 
-                                        // Y-Axis Value Labels & Gridlines
+                                        // Real cumulative net worth from ReportsController (was a hardcoded mock curve)
+                                        var trend = reportsController.netWorthTrend;
+                                        var months = [];
+                                        var values = [];
+                                        var minVal = 0, maxVal = 0;
+                                        for (var i = 0; i < trend.length; i++) {
+                                            months.push(trend[i].month);
+                                            values.push(trend[i].netWorth);
+                                            minVal = Math.min(minVal, trend[i].netWorth);
+                                            maxVal = Math.max(maxVal, trend[i].netWorth);
+                                        }
+
+                                        // Y-axis range: extends below zero only if net worth actually dipped negative
+                                        var axisMax = niceMax(Math.max(maxVal, 1));
+                                        var axisMin = minVal < 0 ? -niceMax(-minVal) : 0;
+                                        var axisRange = (axisMax - axisMin) || 1;
+
+                                        function valueToY(v) {
+                                            return padT + chartH - ((v - axisMin) / axisRange) * chartH;
+                                        }
+
+                                        // Y-Axis Value Labels & Gridlines (auto-scaled to the real data)
                                         ctx.font = "11px 'Inter', sans-serif";
                                         ctx.fillStyle = "#94a3b8";
                                         ctx.textAlign = "right";
@@ -367,11 +441,12 @@ Rectangle {
                                         ctx.strokeStyle = "#f1f5f9";
                                         ctx.lineWidth = 1;
 
-                                        var yTicks = ["30M", "22.5M", "15M", "7.5M", "0"];
-                                        for (var i = 0; i < yTicks.length; i++) {
-                                            var ratio = i / (yTicks.length - 1);
+                                        var tickCount = 5;
+                                        for (var tIdx = 0; tIdx < tickCount; tIdx++) {
+                                            var ratio = tIdx / (tickCount - 1);
+                                            var val = axisMax - ratio * axisRange;
                                             var y = padT + ratio * chartH;
-                                            ctx.fillText(yTicks[i], padL - 8, y);
+                                            ctx.fillText(formatShort(val), padL - 8, y);
 
                                             ctx.beginPath();
                                             ctx.moveTo(padL, y);
@@ -379,21 +454,19 @@ Rectangle {
                                             ctx.stroke();
                                         }
 
-                                        // Net Worth Curve Points
-                                        var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-                                        var nwRatios = [0.30, 0.45, 0.55, 0.62, 0.78, 0.88];
                                         var count = months.length;
-                                        var step = chartW / (count - 1);
+                                        var step = count > 1 ? chartW / (count - 1) : chartW;
+                                        var zeroY = valueToY(0);
 
-                                        // Draw Area Gradient Fill
+                                        // Draw Area Gradient Fill (baseline is the zero line, not always the chart bottom)
                                         ctx.beginPath();
-                                        ctx.moveTo(padL, padT + chartH);
+                                        ctx.moveTo(padL, zeroY);
                                         for (var p = 0; p < count; p++) {
                                             var px = padL + p * step;
-                                            var py = padT + chartH - (nwRatios[p] * chartH);
+                                            var py = valueToY(values[p]);
                                             ctx.lineTo(px, py);
                                         }
-                                        ctx.lineTo(padL + (count - 1) * step, padT + chartH);
+                                        ctx.lineTo(padL + (count - 1) * step, zeroY);
                                         ctx.closePath();
 
                                         var grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
@@ -408,7 +481,7 @@ Rectangle {
                                         ctx.lineWidth = 2.5;
                                         for (var l = 0; l < count; l++) {
                                             var lx = padL + l * step;
-                                            var ly = padT + chartH - (nwRatios[l] * chartH);
+                                            var ly = valueToY(values[l]);
                                             if (l === 0) ctx.moveTo(lx, ly);
                                             else ctx.lineTo(lx, ly);
                                         }
@@ -419,7 +492,7 @@ Rectangle {
                                         ctx.textBaseline = "top";
                                         for (var d = 0; d < count; d++) {
                                             var dx = padL + d * step;
-                                            var dy = padT + chartH - (nwRatios[d] * chartH);
+                                            var dy = valueToY(values[d]);
 
                                             ctx.fillStyle = "#6366f1";
                                             ctx.beginPath();
@@ -432,6 +505,7 @@ Rectangle {
                                     }
                                     onWidthChanged: requestPaint()
                                     onHeightChanged: requestPaint()
+                                    Component.onCompleted: requestPaint()
                                 }
                             }
                         }
@@ -550,6 +624,7 @@ Rectangle {
                                         }
                                         onWidthChanged: requestPaint()
                                         onHeightChanged: requestPaint()
+                                        Component.onCompleted: requestPaint()
                                     }
                                 }
 
@@ -677,6 +752,7 @@ Rectangle {
                                         }
                                         onWidthChanged: requestPaint()
                                         onHeightChanged: requestPaint()
+                                        Component.onCompleted: requestPaint()
                                     }
                                 }
 
