@@ -68,7 +68,19 @@ set(PROJECT_SOURCES
         backend/models/budget.cpp
 
         backend/storage/database_manager.h
-        backend/storage/database_manager_category.cpp
+        backend/storage/database_manager.cpp
+
+        backend/dao/ibase_dao.h
+        backend/dao/category_dao.h
+        backend/dao/category_dao.cpp
+        backend/dao/bill_dao.h
+        backend/dao/bill_dao.cpp
+        backend/dao/budget_dao.h
+        backend/dao/budget_dao.cpp
+        backend/dao/saving_dao.h
+        backend/dao/saving_dao.cpp
+        backend/dao/transaction_dao.h
+        backend/dao/transaction_dao.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -77,11 +89,6 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         frontend/overview/overview_controller.cpp frontend/overview/overview_controller.h
         backend/models/saving.h backend/models/saving.cpp
-        build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/categories.csv
-        backend/storage/database_manager_bill.cpp
-        backend/storage/database_manager_budget.cpp
-        backend/storage/database_manager_saving.cpp
-        backend/storage/database_manager_transaction.cpp
         gui/categories/categories_widget.ui
         gui/mainwindow.ui
         gui/bills/bills_widget.ui

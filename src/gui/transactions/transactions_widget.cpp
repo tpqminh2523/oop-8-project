@@ -31,7 +31,7 @@ TransactionsWidget::TransactionsWidget(QWidget *parent)
         if (dialog.exec() == QDialog::Accepted) {
             // Tạo đối tượng Income/Expense tương ứng
             Transaction* newTx = nullptr;
-            int newId = DatabaseManager::instance().generateNextTransactionId();
+            int newId = 0; // DAO will auto-generate ID
             
             if (dialog.getTransactionType() == "Thu") {
                 Income* inc = new Income(newId, dialog.getAmount(), dialog.getDateTime(), dialog.getNote(), dialog.getCategoryId(), "Income", dialog.getPaymentMethod());
@@ -42,8 +42,7 @@ TransactionsWidget::TransactionsWidget(QWidget *parent)
             }
 
             // Lưu vào Database
-            DatabaseManager::instance().addTransaction(newTx);
-            DatabaseManager::instance().saveTransactionsToCSV();
+            DatabaseManager::instance().transactionDAO()->add(newTx);
 
             // Cập nhật lại Bảng
             loadTransactionsToTable();
@@ -62,8 +61,8 @@ TransactionsWidget::~TransactionsWidget() {
 void TransactionsWidget::loadTransactionsToTable() {
     // 1. Lấy dữ liệu từ Database
     // (Lưu ý: Bạn phải gọi loadTransactionsFromCSV() ở main.cpp hoặc mainwindow trước đó)
-    const QVector<Transaction*>& transactions = DatabaseManager::instance().getAllTransactions();
-    const QVector<Category>& categories = DatabaseManager::instance().getAllCategories();
+    const QVector<Transaction*>& transactions = DatabaseManager::instance().transactionDAO()->getAll();
+    const QVector<Category>& categories = DatabaseManager::instance().categoryDAO()->getAll();
 
     // 2. Thiết lập số lượng hàng cho bảng
     ui->tableWidget->setRowCount(transactions.size());

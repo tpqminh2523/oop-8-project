@@ -56,7 +56,7 @@ void TransactionDialog::onAmountTextChanged(const QString &text)
 
 void TransactionDialog::populateCategories()
 {
-    const QVector<Category>& categories = DatabaseManager::instance().getAllCategories();
+    const QVector<Category>& categories = DatabaseManager::instance().categoryDAO()->getAll();
     for (const Category& cat : categories) {
         // Lưu Id vào UserData (ẩn) và hiển thị Name
         ui->comboCategory->addItem(cat.getName(), cat.getId());

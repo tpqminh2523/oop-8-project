@@ -30,7 +30,8 @@ public:
     double getCurrent() const{return currentAmount;}
     QDate getDueDate() const {return dueDate;}
 
-    //setter, để tránh lỗi đè cùng ID, đừng viết hàm setId.
+    //setter
+    void setId(int newId) { id = newId; }
 };
 
 #endif // SAVING_H

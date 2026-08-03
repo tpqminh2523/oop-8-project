@@ -21,7 +21,7 @@ CategoriesController::CategoriesController(CategoriesWidget *widget, QObject *pa
 }
 
 void CategoriesController::refreshCategoryList() {
-    const QVector<Category>& categories = DatabaseManager::instance().getAllCategories();
+    const QVector<Category>& categories = DatabaseManager::instance().categoryDAO()->getAll();
 
     QVector<Category> results;
     for (const Category& cat : categories){
@@ -47,7 +47,7 @@ void CategoriesController::onAddCategoryRequested(const QString &name, int paren
         return;
     }
 
-    DatabaseManager::instance().addUserCustomCategory(name, parentId);
+    DatabaseManager::instance().categoryDAO()->add(Category(0, parentId, name));
     refreshCategoryList();
 }
 
@@ -57,7 +57,7 @@ void CategoriesController::onFilterChanged(int parentId){
 }
 
 void CategoriesController::onCategoryParentChanged(int id,int newParentId){
-    DatabaseManager::instance().updateCategoryParent(id, newParentId);
+    DatabaseManager::instance().categoryDAO()->updateParent(id, newParentId);
 
     QTimer::singleShot(0, this, [this]() {
         refreshCategoryList();
@@ -75,7 +75,7 @@ void CategoriesController::onRemoveCategoryRequested(int id, const QString& name
         );
 
     if (reply == QMessageBox::Yes) {
-        DatabaseManager::instance().removeCategory(id);
+        DatabaseManager::instance().categoryDAO()->remove(id);
         refreshCategoryList();
     }
 }

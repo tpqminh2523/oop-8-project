@@ -1,16 +1,21 @@
-#include "database_manager.h"
+#include "transaction_dao.h"
 #include <QFile>
 #include <QTextStream>
 #include <QDir>
 #include <QDebug>
 #include <QStandardPaths>
-#include <QCoreApplication>
+#include <QUrl>
 
-// ==========================================================
-// 🎯 CÁC HÀM XỬ LÝ GIAO DỊCH (CRUD - OOP)
-// ==========================================================
+TransactionDAO::TransactionDAO() {
+    loadFromCSV();
+}
 
-int DatabaseManager::generateNextTransactionId() const {
+TransactionDAO::~TransactionDAO() {
+    qDeleteAll(m_transactions);
+    m_transactions.clear();
+}
+
+int TransactionDAO::generateNextId() const {
     int maxId = 0;
     for (Transaction* tx : m_transactions) {
         if (tx->getId() > maxId) {
@@ -20,11 +25,47 @@ int DatabaseManager::generateNextTransactionId() const {
     return maxId + 1;
 }
 
-void DatabaseManager::loadTransactionsFromCSV() {
-    // Xóa dữ liệu cũ nếu có
-    for (Transaction* tx : m_transactions) {
-        delete tx;
+const QVector<Transaction*>& TransactionDAO::getAll() const {
+    return m_transactions;
+}
+
+void TransactionDAO::add(Transaction* item) {
+    if (item) {
+        if (item->getId() <= 0) {
+            item->setId(generateNextId());
+        }
+        m_transactions.append(item);
+        saveToCSV();
     }
+}
+
+bool TransactionDAO::update(int id, Transaction* item) {
+    for (int i = 0; i < m_transactions.size(); ++i) {
+        if (m_transactions[i]->getId() == id) {
+            delete m_transactions[i];
+            item->setId(id);
+            m_transactions[i] = item;
+            saveToCSV();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool TransactionDAO::remove(int id) {
+    for (int i = 0; i < m_transactions.size(); ++i) {
+        if (m_transactions[i]->getId() == id) {
+            delete m_transactions[i];
+            m_transactions.removeAt(i);
+            saveToCSV();
+            return true;
+        }
+    }
+    return false;
+}
+
+void TransactionDAO::loadFromCSV() {
+    qDeleteAll(m_transactions);
     m_transactions.clear();
 
     QString appDataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -37,13 +78,10 @@ void DatabaseManager::loadTransactionsFromCSV() {
     QFile file(filePath);
     
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "Cannot open transactions.csv for reading or file does not exist yet.";
         return;
     }
 
     QTextStream in(&file);
-    
-    // Bỏ qua dòng tiêu đề
     if (!in.atEnd()) {
         in.readLine();
     }
@@ -52,7 +90,6 @@ void DatabaseManager::loadTransactionsFromCSV() {
         QString line = in.readLine();
         QStringList fields = line.split(",");
         
-        // Expected format: ID, Amount, DateTime, Note, CategoryId, TransactionType, PaymentMethod, ClassType, ReceiptImagePath, Status, Source, Payee, IsEssential
         if (fields.size() >= 13) {
             int id = fields[0].toInt();
             double amount = fields[1].toDouble();
@@ -85,7 +122,7 @@ void DatabaseManager::loadTransactionsFromCSV() {
     file.close();
 }
 
-void DatabaseManager::saveTransactionsToCSV() const {
+void TransactionDAO::saveToCSV() const {
     QString appDataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir dir(appDataDir);
     if (!dir.exists()) {
@@ -96,7 +133,6 @@ void DatabaseManager::saveTransactionsToCSV() const {
     QFile file(filePath);
     
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qDebug() << "Cannot open transactions.csv for writing.";
         return;
     }
 
@@ -136,37 +172,58 @@ void DatabaseManager::saveTransactionsToCSV() const {
     file.close();
 }
 
-void DatabaseManager::addTransaction(Transaction* newTransaction) {
-    if (newTransaction) {
-        m_transactions.append(newTransaction);
-        saveTransactionsToCSV();
+static QString resolveLocalPath(const QString& path) {
+    QUrl url(path);
+    if (url.isValid() && url.isLocalFile()) {
+        return url.toLocalFile();
     }
+    if (path.startsWith("file:", Qt::CaseInsensitive)) {
+        return QUrl(path).toLocalFile();
+    }
+    return path;
 }
 
-bool DatabaseManager::updateTransaction(int id, double amount, const QDateTime& dateTime, int categoryId, const QString& note, const QString& transactionType, const QString& paymentMethod) {
+bool TransactionDAO::exportToCSV(const QString& targetFilePath) const {
+    QString cleanPath = resolveLocalPath(targetFilePath);
+    QFile file(cleanPath);
+    
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    QTextStream out(&file);
+    out << "ID,Amount,DateTime,Note,CategoryId,TransactionType,PaymentMethod,ClassType,ReceiptImagePath,Status,Payer,Payee,IsEssential\n";
+
     for (Transaction* tx : m_transactions) {
-        if (tx->getId() == id) {
-            tx->setAmount(amount);
-            tx->setDateTime(dateTime);
-            tx->setCategoryId(categoryId);
-            tx->setNote(note);
-            tx->setTransactionType(transactionType);
-            tx->setPaymentMethod(paymentMethod);
-            saveTransactionsToCSV();
-            return true;
-        }
-    }
-    return false;
-}
+        QString classType = "Transaction";
+        QString payer = "";
+        QString payee = "";
+        QString isEssential = "";
 
-bool DatabaseManager::deleteTransaction(int id) {
-    for (int i = 0; i < m_transactions.size(); ++i) {
-        if (m_transactions[i]->getId() == id) {
-            delete m_transactions[i];
-            m_transactions.removeAt(i);
-            saveTransactionsToCSV();
-            return true;
+        if (Income* income = dynamic_cast<Income*>(tx)) {
+            classType = "Income";
+            payer = income->getPayer();
+        } else if (Expense* expense = dynamic_cast<Expense*>(tx)) {
+            classType = "Expense";
+            payee = expense->getPayee();
+            isEssential = expense->getIsEssential() ? "1" : "0";
         }
+
+        out << tx->getId() << ","
+            << QString::number(tx->getAmount(), 'f', 2) << ","
+            << tx->getDateTime().toString(Qt::ISODate) << ","
+            << tx->getNote() << ","
+            << tx->getCategoryId() << ","
+            << tx->getTransactionType() << ","
+            << tx->getPaymentMethod() << ","
+            << classType << ","
+            << tx->getReceiptImagePath() << ","
+            << tx->getStatus() << ","
+            << payer << ","
+            << payee << ","
+            << isEssential << "\n";
     }
-    return false;
+    
+    file.close();
+    return true;
 }

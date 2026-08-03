@@ -30,7 +30,8 @@ public:
     QDate getStartDate() const {return startDate;}
     QDate getEndDate() const {return endDate;}
 
-    //setter, để tránh lỗi đè cùng ID, đừng viết hàm setId.
+    //setter
+    void setId(int newId) { id = newId; }
 };
 
 #endif // BUDGET_H

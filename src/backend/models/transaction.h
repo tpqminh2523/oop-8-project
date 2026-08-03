@@ -33,7 +33,8 @@ public:
     QString getReceiptImagePath() const {return receiptImagePath;}
     QString getStatus() const {return status;}
 
-    //setter, để tránh lỗi đè cùng ID, đừng viết hàm setId.
+    //setter
+    void setId(int newId) { id = newId; }
     void setAmount(double n_amount) { amount = n_amount; }
     void setCategoryId(int n_categoryid) { categoryId = n_categoryid; }
     void setNote(const QString& n_note) { note = n_note; }

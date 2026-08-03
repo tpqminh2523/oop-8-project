@@ -2,120 +2,67 @@
 #ifndef DATABASE_MANAGER_H
 #define DATABASE_MANAGER_H
 
-/*
- * Đây sẽ là nơi mng khai báo các hàm/biến backend gì gì đó cho phần của mình
- * Để nhắc lại đây sẽ CHỈ LÀ NƠI để khai báo, còn để viết logic ra hoàn chỉnh hãy vào file .cpp tương ứng để sửa
- * Và có lý do tại sao tui mới để nhiều comment đến vậy, để còn đường đọc code cho hiểu nữa
-*/
-
 #include <QObject>
-#include <QVector>
 #include <QString>
-#include "../models/category.h"
-#include "../models/bill.h"
-#include "../models/budget.h"
-#include "../models/saving.h"
-#include "../models/transaction.h"
+#include <QCoreApplication>
+#include <QDir>
+#include "../dao/category_dao.h"
+#include "../dao/bill_dao.h"
+#include "../dao/budget_dao.h"
+#include "../dao/saving_dao.h"
+#include "../dao/transaction_dao.h"
 
 class DatabaseManager : public QObject {
     Q_OBJECT
 
 private:
-
+    CategoryDAO* m_categoryDAO;
+    BillDAO* m_billDAO;
+    BudgetDAO* m_budgetDAO;
+    SavingDAO* m_savingDAO;
+    TransactionDAO* m_transactionDAO;
 
     explicit DatabaseManager(QObject *parent = nullptr);
-    ~DatabaseManager() = default;
-
-    //===========================CATEGORY SECTION=============================
-
-    QVector<Category> m_categories;
-
-    int generateNextCategoryId() const;
-
-
-    //=============================BILL SECTION==================================
-
-
-
-
-    //=============================BUDGET SECTION==================================
-
-
-
-
-    //=============================SAVING SECTION==================================
-
-
-
-
-
-    //==========================TRANSACTION SECTION=================================
-    QVector<Transaction*> m_transactions;
+    ~DatabaseManager();
 
 public:
-
-    // Hàm lấy instance duy nhất để sử dụng toàn hệ thống
     static DatabaseManager& instance() {
         static DatabaseManager instance;
         return instance;
     }
 
-    // Ngăn chặn sao chép dữ liệu database
     DatabaseManager(const DatabaseManager&) = delete;
     DatabaseManager& operator=(const DatabaseManager&) = delete;
 
-    //=============================CATEGORY SECTION================================
+    static QString getDataDirectoryPath() {
+        static QString cachedPath;
+        if (cachedPath.isEmpty()) {
+            QDir devDir(QCoreApplication::applicationDirPath() + "/../../data");
+            if (devDir.exists()) {
+                cachedPath = devDir.absolutePath();
+            } else {
+                cachedPath = QCoreApplication::applicationDirPath() + "/data";
+            }
+        }
+        return cachedPath;
+    }
 
-    // Đọc và Ghi file CSV
-    void loadCategoriesFromCSV();
-    void saveCategoriesToCSV() const;
+signals:
+    void dataChanged();
 
-    // API lấy danh sách danh mục cấp cho giao diện UI hiển thị
-    const QVector<Category>& getAllCategories() const { return m_categories; }
+public:
+    CategoryDAO* categoryDAO() const { return m_categoryDAO; }
+    BillDAO* billDAO() const { return m_billDAO; }
+    BudgetDAO* budgetDAO() const { return m_budgetDAO; }
+    SavingDAO* savingDAO() const { return m_savingDAO; }
+    TransactionDAO* transactionDAO() const { return m_transactionDAO; }
 
-    // Hàm thêm danh mục tùy chỉnh từ Giao diện (UI truyền: Tên, và Root ID từ 1 đến 5)
-    void addUserCustomCategory(const QString& name, int parentId);
-
-    void updateCategoryParent(int id, int newParentId);
-    void removeCategory(int id);
-
-    //=============================BILL SECTION==================================
-
-
-
-
-    //=============================BUDGET SECTION==================================
-
-
-
-
-    //=============================SAVING SECTION==================================
-
-
-
-
-
-    //==========================TRANSACTION SECTION=================================
-    // CÁC HÀM XỬ LÝ GIAO DỊCH (CRUD - OOP)
+    // Cross-cutting business logic
+    void addExpenseToBudget(int categoryId, double amount);
+    bool contributeToSaving(int savingId, double amount);
     
-    // Sinh ID mới cho Giao dịch
-    int generateNextTransactionId() const;
-    
-    // Đọc và Ghi file CSV cho giao dịch
-    void loadTransactionsFromCSV();
-    void saveTransactionsToCSV() const;
-    
-    // API Read: Lấy danh sách giao dịch
-    const QVector<Transaction*>& getAllTransactions() const { return m_transactions; }
-    
-    // API Create: Thêm giao dịch (Truyền con trỏ đa hình vào)
-    void addTransaction(Transaction* newTransaction);
-    
-    // API Update: Cập nhật giao dịch bằng ID
-    bool updateTransaction(int id, double amount, const QDateTime& dateTime, int categoryId, const QString& note, const QString& transactionType, const QString& paymentMethod);
-    
-    // API Delete: Xóa giao dịch bằng ID
-    bool deleteTransaction(int id);
+    // Export All
+    bool exportAllToCSV(const QString& targetFolderPath) const;
 };
 
 #endif // DATABASE_MANAGER_H
